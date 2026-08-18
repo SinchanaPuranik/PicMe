@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: picme_user
+      POSTGRES_PASSWORD: picme_pass
+      POSTGRES_DB: picme_prod
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U picme_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 run:app
+    volumes:
+      - ./app/static/uploads:/app/app/static/uploads
+      - ./models:/app/models
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://picme_user:picme_pass@db:5432/picme_prod
+      - SECRET_KEY=change-this-to-random-secret-key
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

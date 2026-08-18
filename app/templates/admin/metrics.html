@@ -1,0 +1,175 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Performance Metrics - PICME{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-chart-line"></i> Performance Metrics</h2>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="alert alert-info">
+    <i class="fas fa-info-circle"></i>
+    <strong>About Metrics:</strong> These metrics compare FaceNet and ArcFace models on face matching accuracy and performance.
+</div>
+
+<!-- Comparison Cards -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-brain"></i> MTCNN Detection</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th>Embedding Size:</th>
+                        <td>128 dimensions</td>
+                    </tr>
+                    <tr>
+                        <th>Distance Metric:</th>
+                        <td>Euclidean Distance</td>
+                    </tr>
+                    <tr>
+                        <th>Speed:</th>
+                        <td><span class="badge bg-success">Fast</span></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-robot"></i> RetinaFace Detection</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th>Embedding Size:</th>
+                        <td>Single-stage detector</td></td>
+                    </tr>
+                    <tr>
+                        <th>Distance Metric:</th>
+                        <td>Better for difficult angles</td></td>
+                    </tr>
+                    <tr>
+                        <th>Speed:</th>
+                        <td><span class="badge bg-warning">Moderate</span></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics Table -->
+<div class="card shadow">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="fas fa-table"></i> Evaluation Results</h5>
+    </div>
+    <div class="card-body">
+        {% if metrics %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Metric</th>
+                        <th>Value</th>
+                        <th>Test Set Size</th>
+                        <th>Date</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for metric in metrics %}
+                    <tr>
+                        <td>
+                            {% if metric.model_type == 'facenet' %}
+                            <span class="badge bg-primary">FaceNet</span>
+                            {% else %}
+                            <span class="badge bg-info">ArcFace</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ metric.metric_type }}</strong></td>
+                        <td>
+                            {% if metric.metric_type in ['precision', 'recall', 'f1_score'] %}
+                            {{ (metric.value * 100)|round(2) }}%
+                            {% else %}
+                            {{ metric.value|round(4) }}
+                            {% endif %}
+                        </td>
+                        <td>{{ metric.test_set_size or 'N/A' }}</td>
+                        <td>{{ metric.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ metric.notes or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-chart-bar fa-4x text-muted mb-3"></i>
+            <h5 class="text-muted">No metrics available</h5>
+            <p class="text-muted mb-3">Run evaluation tests to generate performance metrics</p>
+            
+            <div class="alert alert-warning text-start mx-auto" style="max-width: 600px;">
+                <h6><i class="fas fa-terminal"></i> How to Generate Metrics:</h6>
+                <ol class="mb-0">
+                    <li>Ensure you have uploaded and processed photos in an event</li>
+                    <li>Open a terminal/PowerShell in the project directory</li>
+                    <li>Activate virtual environment: <code>.\venv\Scripts\Activate.ps1</code></li>
+                    <li>Run evaluation script: <code>python run_evaluation.py</code></li>
+                    <li>Refresh this page to view results</li>
+                </ol>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Metric Explanations -->
+<div class="card mt-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="fas fa-question-circle"></i> Metric Definitions</h5>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3">Precision</dt>
+            <dd class="col-sm-9">
+                Percentage of retrieved photos that actually contain the person (fewer false positives = higher precision)
+            </dd>
+            
+            <dt class="col-sm-3">Recall</dt>
+            <dd class="col-sm-9">
+                Percentage of all photos containing the person that were successfully retrieved (fewer false negatives = higher recall)
+            </dd>
+            
+            <dt class="col-sm-3">F1-Score</dt>
+            <dd class="col-sm-9">
+                Harmonic mean of precision and recall, providing a single balanced metric
+            </dd>
+            
+            <dt class="col-sm-3">False Positives</dt>
+            <dd class="col-sm-9">
+                Photos incorrectly identified as containing the person
+            </dd>
+            
+            <dt class="col-sm-3">False Negatives</dt>
+            <dd class="col-sm-9">
+                Photos containing the person that were missed
+            </dd>
+            
+            <dt class="col-sm-3">Processing Time</dt>
+            <dd class="col-sm-9">
+                Average time to generate embeddings and match faces
+            </dd>
+        </dl>
+    </div>
+</div>
+{% endblock %}
+

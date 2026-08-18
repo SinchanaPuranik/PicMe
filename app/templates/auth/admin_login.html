@@ -1,0 +1,82 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Admin Login - PICME{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-lg border-danger">
+            <div class="card-header bg-danger text-white text-center">
+                <i class="fas fa-user-shield fa-3x mb-2"></i>
+                <h3 class="mb-0">Admin / Creator Login</h3>
+                <small>Event organizers and administrators only</small>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('auth.admin_login') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">
+                            <i class="fas fa-user"></i> Admin Username
+                        </label>
+                        <input type="text" 
+                               class="form-control form-control-lg" 
+                               id="username" 
+                               name="username" 
+                               placeholder="Enter admin username"
+                               required 
+                               autofocus>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            <i class="fas fa-lock"></i> Password
+                        </label>
+                        <input type="password" 
+                               class="form-control form-control-lg" 
+                               id="password" 
+                               name="password" 
+                               placeholder="Enter password"
+                               required>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                        <label class="form-check-label" for="remember">Remember me</label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-danger btn-lg w-100">
+                        <i class="fas fa-sign-in-alt"></i> Admin Login
+                    </button>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <p class="text-muted mb-2">Not an admin?</p>
+                    <a href="{{ url_for('auth.user_login') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-user"></i> User Login
+                    </a>
+                </div>
+                
+                <div class="alert alert-info mt-3" role="alert">
+                    <small>
+                        <strong><i class="fas fa-info-circle"></i> Admin Access:</strong><br>
+                        • Create and manage events<br>
+                        • Upload and process photos<br>
+                        • View analytics and metrics<br>
+                        • Generate QR codes
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.card.border-danger {
+    border-width: 2px;
+}
+</style>
+{% endblock %}
+{% endblock %}
