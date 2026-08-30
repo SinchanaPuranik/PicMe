@@ -911,64 +911,6 @@ def delete_photo(photo_id):
 
 
 # ============================================================
-# TEST DETECTORS
-# ============================================================
-
-@admin_bp.route(
-    '/detectors/test'
-)
-@login_required
-@admin_required
-def test_detectors():
-
-    from app.services.face_detection import (
-        get_available_detectors,
-        benchmark_detectors
-    )
-
-    available_detectors = (
-        get_available_detectors()
-    )
-
-    sample_photo = (
-        Photo.query.first()
-    )
-
-    benchmark_results = None
-
-    if (
-        sample_photo
-        and
-        os.path.exists(
-            sample_photo.filepath
-        )
-    ):
-
-        try:
-
-            benchmark_results = (
-                benchmark_detectors(
-                    sample_photo.filepath,
-                    min_confidence=0.9
-                )
-            )
-
-        except Exception as e:
-
-            flash(
-                f'Error benchmarking detectors: {str(e)}',
-                'warning'
-            )
-
-    return render_template(
-        'admin/test_detectors.html',
-        available_detectors=available_detectors,
-        benchmark_results=benchmark_results,
-        sample_photo=sample_photo
-    )
-
-
-# ============================================================
 # BENCHMARK API
 # ============================================================
 
