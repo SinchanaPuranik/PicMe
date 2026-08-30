@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Test Face Detectors{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0"><i class="fas fa-flask"></i> Face Detector Testing & Comparison</h4>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Detector Availability -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-check-circle"></i> Available Detectors</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-3 col-6 mb-3">
+                                    <div class="p-3 border rounded {% if available_detectors.mtcnn %}bg-success-subtle{% else %}bg-secondary-subtle{% endif %}">
+                                        <h6>MTCNN</h6>
+                                        <p class="mb-0">
+                                            {% if available_detectors.mtcnn %}
+                                                <span class="badge bg-success">✓ Available</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">✗ Not Available</span>
+                                            {% endif %}
+                                        </p>
+                                        <small class="text-muted">Multi-task CNN</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-3">
+                                    <div class="p-3 border rounded {% if available_detectors.haar %}bg-success-subtle{% else %}bg-secondary-subtle{% endif %}">
+                                        <h6>Haar Cascade</h6>
+                                        <p class="mb-0">
+                                            {% if available_detectors.haar %}
+                                                <span class="badge bg-success">✓ Available</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">✗ Not Available</span>
+                                            {% endif %}
+                                        </p>
+                                        <small class="text-muted">Classical CV</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-3">
+                                    <div class="p-3 border rounded {% if available_detectors.dnn %}bg-success-subtle{% else %}bg-secondary-subtle{% endif %}">
+                                        <h6>DNN</h6>
+                                        <p class="mb-0">
+                                            {% if available_detectors.dnn %}
+                                                <span class="badge bg-success">✓ Available</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">✗ Not Available</span>
+                                            {% endif %}
+                                        </p>
+                                        <small class="text-muted">Deep Neural Net</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-6 mb-3">
+                                    <div class="p-3 border rounded {% if available_detectors.retinaface %}bg-success-subtle{% else %}bg-secondary-subtle{% endif %}">
+                                        <h6>RetinaFace</h6>
+                                        <p class="mb-0">
+                                            {% if available_detectors.retinaface %}
+                                                <span class="badge bg-success">✓ Available</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">✗ Not Available</span>
+                                            {% endif %}
+                                        </p>
+                                        <small class="text-muted">State-of-the-art</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detector Comparison -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-info-circle"></i> Detector Comparison</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Detector</th>
+                                            <th>Speed</th>
+                                            <th>Accuracy</th>
+                                            <th>Best Use Case</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>MTCNN</strong></td>
+                                            <td><span class="badge bg-warning">Medium</span></td>
+                                            <td><span class="badge bg-success">High</span></td>
+                                            <td>General purpose, balanced performance</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Haar Cascade</strong></td>
+                                            <td><span class="badge bg-success">Fast</span></td>
+                                            <td><span class="badge bg-warning">Medium</span></td>
+                                            <td>Quick detection, frontal faces</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>DNN</strong></td>
+                                            <td><span class="badge bg-warning">Medium</span></td>
+                                            <td><span class="badge bg-success">High</span></td>
+                                            <td>Various angles, good accuracy</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>RetinaFace</strong></td>
+                                            <td><span class="badge bg-danger">Slow</span></td>
+                                            <td><span class="badge bg-success">Very High</span></td>
+                                            <td>Best accuracy, landmark detection</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Benchmark Results -->
+                    {% if benchmark_results %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Benchmark Results</h5>
+                            {% if sample_photo %}
+                            <small>Test Image: {{ sample_photo.filename }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for detector_name, result in benchmark_results.items() %}
+                                <div class="col-md-6 col-lg-3 mb-3">
+                                    <div class="card {% if result.success %}border-success{% else %}border-danger{% endif %}">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">{{ detector_name.upper() }}</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            {% if result.success %}
+                                                <p class="mb-1">
+                                                    <strong>Faces Detected:</strong> 
+                                                    <span class="badge bg-primary">{{ result.num_faces }}</span>
+                                                </p>
+                                                <p class="mb-1">
+                                                    <strong>Processing Time:</strong><br>
+                                                    <span class="text-primary">{{ "%.3f"|format(result.time_seconds) }}s</span>
+                                                </p>
+                                                <span class="badge bg-success">✓ Success</span>
+                                            {% else %}
+                                                <p class="text-danger mb-1">
+                                                    <i class="fas fa-exclamation-triangle"></i> Failed
+                                                </p>
+                                                {% if result.error %}
+                                                <small class="text-muted">{{ result.error }}</small>
+                                                {% endif %}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- Visualization -->
+                            <div class="mt-3">
+                                <h6>Performance Comparison:</h6>
+                                <canvas id="detectorChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        No benchmark results available. Upload and process photos to see detector comparison.
+                    </div>
+                    {% endif %}
+
+                    <!-- Back Button -->
+                    <div class="text-center">
+                        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if benchmark_results %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Prepare data for chart
+    const detectorNames = {{ benchmark_results.keys()|list|tojson }};
+    const processingTimes = [
+        {% for detector_name, result in benchmark_results.items() %}
+        {{ result.time_seconds if result.success else 0 }},
+        {% endfor %}
+    ];
+    const facesDetected = [
+        {% for detector_name, result in benchmark_results.items() %}
+        {{ result.num_faces if result.success else 0 }},
+        {% endfor %}
+    ];
+
+    // Create chart
+    const ctx = document.getElementById('detectorChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: detectorNames.map(name => name.toUpperCase()),
+            datasets: [
+                {
+                    label: 'Processing Time (seconds)',
+                    data: processingTimes,
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Faces Detected',
+                    data: facesDetected,
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Time (seconds)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Faces Detected'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Detector Performance Comparison'
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

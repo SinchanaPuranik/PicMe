@@ -1,0 +1,1407 @@
+{% extends "base.html" %}
+
+{% block title %}Annotate Image - PICME{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="fas fa-pen"></i> Annotate Ground-Truth Faces
+    </h2>
+
+    <a href="{{ url_for('admin.test_dataset') }}"
+       class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dataset
+    </a>
+</div>
+
+
+<div class="row">
+
+    <!-- =====================================================
+         CANVAS
+    ====================================================== -->
+
+    <div class="col-lg-8">
+
+        <div class="card shadow">
+
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="mb-0">
+                    {{ test_img.filename }}
+                </h5>
+            </div>
+
+            <div class="card-body">
+
+                <div class="alert alert-info">
+
+                    <i class="fas fa-info-circle"></i>
+
+                    <strong>Instructions:</strong>
+
+                    <ul class="mb-0 mt-2">
+
+                        <li>
+                            Click <b>Auto Annotate Faces</b> to detect faces automatically.
+                        </li>
+
+                        <li>
+                            Carefully check all generated boxes.
+                        </li>
+
+                        <li>
+                            Drag on the image to manually add a missed face.
+                        </li>
+
+                        <li>
+                            Double-click an existing box to delete it.
+                        </li>
+
+                        <li>
+                            Click <b>Save Annotations</b> after verification.
+                        </li>
+
+                    </ul>
+
+                </div>
+
+
+                <!-- =================================================
+                     IMAGE CANVAS
+                ================================================== -->
+
+                <div style="
+                    position: relative;
+                    display: inline-block;
+                    max-width: 100%;
+                    overflow: auto;
+                ">
+
+                    <canvas
+                        id="annotationCanvas"
+                        style="
+                            border: 2px solid #007bff;
+                            cursor: crosshair;
+                            display: block;
+                            max-width: 100%;
+                        ">
+                    </canvas>
+
+                </div>
+
+
+                <!-- =================================================
+                     BUTTONS
+                ================================================== -->
+
+                <div class="mt-3 d-flex flex-wrap gap-2">
+
+                    <button
+                        id="autoAnnotateBtn"
+                        type="button"
+                        class="btn btn-primary">
+
+                        <i class="fas fa-magic"></i>
+                        Auto Annotate Faces
+
+                    </button>
+
+
+                    <button
+                        id="clearBtn"
+                        type="button"
+                        class="btn btn-warning">
+
+                        <i class="fas fa-eraser"></i>
+                        Clear All
+
+                    </button>
+
+
+                    <button
+                        id="undoBtn"
+                        type="button"
+                        class="btn btn-info">
+
+                        <i class="fas fa-undo"></i>
+                        Undo Last
+
+                    </button>
+
+
+                    <button
+                        id="saveBtn"
+                        type="button"
+                        class="btn btn-success">
+
+                        <i class="fas fa-save"></i>
+                        Save Annotations
+
+                    </button>
+
+                </div>
+
+
+                <!-- =================================================
+                     STATUS
+                ================================================== -->
+
+                <div
+                    id="autoStatus"
+                    class="mt-3"
+                    style="display:none;">
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         INFORMATION
+    ========================================================== -->
+
+    <div class="col-lg-4">
+
+        <!-- CURRENT ANNOTATIONS -->
+
+        <div class="card shadow mb-3">
+
+            <div class="card-header bg-gradient-success text-white">
+
+                <h5 class="mb-0">
+
+                    <i class="fas fa-square"></i>
+                    Current Annotations
+
+                </h5>
+
+            </div>
+
+
+            <div class="card-body">
+
+                <div class="alert alert-success">
+
+                    <strong>Total Faces:</strong>
+
+                    <span
+                        id="boxCount"
+                        style="font-size:20px;">
+                        0
+                    </span>
+
+                </div>
+
+
+                <div id="boxList"></div>
+
+            </div>
+
+        </div>
+
+
+        <!-- EXISTING ANNOTATIONS -->
+
+        <div class="card shadow">
+
+            <div class="card-header bg-gradient-info text-white">
+
+                <h5 class="mb-0">
+
+                    <i class="fas fa-history"></i>
+                    Existing Annotations
+
+                </h5>
+
+            </div>
+
+
+            <div class="card-body">
+
+                {% if annotations %}
+
+                    <ul class="list-group">
+
+                        {% for anno in annotations %}
+
+                            <li class="list-group-item">
+
+                                <strong>
+                                    Face {{ loop.index }}:
+                                </strong>
+
+                                ({{ anno.x }},
+                                {{ anno.y }},
+                                {{ anno.width }},
+                                {{ anno.height }})
+
+                            </li>
+
+                        {% endfor %}
+
+                    </ul>
+
+                {% else %}
+
+                    <p class="text-muted">
+                        No existing annotations
+                    </p>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* ============================================================
+   BASIC VARIABLES
+============================================================ */
+
+const canvas =
+    document.getElementById("annotationCanvas");
+
+const ctx =
+    canvas.getContext("2d");
+
+const image =
+    new Image();
+
+const imageId =
+    {{ test_img.id }};
+
+const imageUrl =
+    "{{ url_for('static', filename='uploads/test_dataset/' + test_img.filename) }}";
+
+
+/*
+ * Existing annotations supplied by Flask.
+ */
+const existingAnnotations =
+    {{ annotations | tojson | safe }};
+
+
+let boxes = [];
+
+let isDrawing = false;
+
+let startX = 0;
+
+let startY = 0;
+
+let currentBox = null;
+
+
+/* ============================================================
+   IMAGE SCALE
+============================================================ */
+
+let scale = 1;
+
+let displayWidth = 0;
+
+let displayHeight = 0;
+
+const maxWidth = 800;
+
+const maxHeight = 600;
+
+
+/* ============================================================
+   LOAD IMAGE
+============================================================ */
+
+image.onload = function () {
+
+    const widthRatio =
+        maxWidth / image.width;
+
+    const heightRatio =
+        maxHeight / image.height;
+
+
+    scale =
+        Math.min(
+            widthRatio,
+            heightRatio,
+            1
+        );
+
+
+    displayWidth =
+        Math.round(
+            image.width * scale
+        );
+
+    displayHeight =
+        Math.round(
+            image.height * scale
+        );
+
+
+    canvas.width =
+        displayWidth;
+
+    canvas.height =
+        displayHeight;
+
+
+    /*
+     * Load existing database annotations.
+     *
+     * Database coordinates are original-image
+     * coordinates, so convert them to canvas
+     * coordinates.
+     */
+
+    if (
+        Array.isArray(existingAnnotations) &&
+        existingAnnotations.length > 0
+    ) {
+
+        boxes =
+            existingAnnotations.map(function (anno) {
+
+                return {
+
+                    x:
+                        Number(anno.x) * scale,
+
+                    y:
+                        Number(anno.y) * scale,
+
+                    width:
+                        Number(anno.width) * scale,
+
+                    height:
+                        Number(anno.height) * scale
+
+                };
+
+            });
+
+    }
+
+
+    drawImage();
+
+};
+
+
+/* ============================================================
+   IMAGE ERROR
+============================================================ */
+
+image.onerror = function () {
+
+    const status =
+        document.getElementById("autoStatus");
+
+    status.style.display = "block";
+
+    status.className =
+        "alert alert-danger mt-3";
+
+    status.innerHTML =
+        "❌ Unable to load image. Check the image path.";
+
+};
+
+
+image.src = imageUrl;
+
+
+/* ============================================================
+   DRAW IMAGE
+============================================================ */
+
+function drawImage() {
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    /*
+     * Draw original image.
+     */
+
+    ctx.drawImage(
+        image,
+        0,
+        0,
+        displayWidth,
+        displayHeight
+    );
+
+
+    /*
+     * Draw all annotation boxes.
+     */
+
+    boxes.forEach(function (box, index) {
+
+        ctx.strokeStyle =
+            "#00ff00";
+
+        ctx.lineWidth = 2;
+
+
+        ctx.strokeRect(
+            box.x,
+            box.y,
+            box.width,
+            box.height
+        );
+
+
+        /*
+         * Face number.
+         */
+
+        const label =
+            String(index + 1);
+
+
+        ctx.font =
+            "bold 12px Arial";
+
+
+        const textWidth =
+            ctx.measureText(label).width;
+
+
+        ctx.fillStyle =
+            "rgba(0, 255, 0, 0.85)";
+
+
+        ctx.fillRect(
+            box.x,
+            Math.max(
+                0,
+                box.y - 16
+            ),
+            textWidth + 8,
+            16
+        );
+
+
+        ctx.fillStyle =
+            "#000000";
+
+
+        ctx.fillText(
+            label,
+            box.x + 4,
+            Math.max(
+                12,
+                box.y - 4
+            )
+        );
+
+    });
+
+
+    /*
+     * Draw currently dragged box.
+     */
+
+    if (currentBox) {
+
+        ctx.strokeStyle =
+            "#ffff00";
+
+        ctx.lineWidth = 2;
+
+
+        ctx.strokeRect(
+            currentBox.x,
+            currentBox.y,
+            currentBox.width,
+            currentBox.height
+        );
+
+    }
+
+
+    updateBoxCount();
+
+}
+
+
+/* ============================================================
+   GET MOUSE POSITION
+============================================================ */
+
+function getMousePosition(event) {
+
+    const rect =
+        canvas.getBoundingClientRect();
+
+
+    /*
+     * Important:
+     * Canvas may be displayed at a different CSS size.
+     * Therefore compensate for the actual displayed size.
+     */
+
+    const scaleX =
+        canvas.width / rect.width;
+
+    const scaleY =
+        canvas.height / rect.height;
+
+
+    return {
+
+        x:
+            (event.clientX - rect.left)
+            * scaleX,
+
+        y:
+            (event.clientY - rect.top)
+            * scaleY
+
+    };
+
+}
+
+
+/* ============================================================
+   MOUSE DOWN
+============================================================ */
+
+canvas.addEventListener(
+    "mousedown",
+    function (event) {
+
+        const position =
+            getMousePosition(event);
+
+
+        startX =
+            position.x;
+
+        startY =
+            position.y;
+
+
+        /*
+         * Double click = delete box.
+         */
+
+        if (event.detail === 2) {
+
+            const clickedIndex =
+                boxes.findIndex(function (box) {
+
+                    return (
+
+                        startX >= box.x &&
+
+                        startX <=
+                            box.x + box.width &&
+
+                        startY >= box.y &&
+
+                        startY <=
+                            box.y + box.height
+
+                    );
+
+                });
+
+
+            if (clickedIndex !== -1) {
+
+                boxes.splice(
+                    clickedIndex,
+                    1
+                );
+
+
+                drawImage();
+
+                return;
+
+            }
+
+        }
+
+
+        isDrawing = true;
+
+    }
+);
+
+
+/* ============================================================
+   MOUSE MOVE
+============================================================ */
+
+canvas.addEventListener(
+    "mousemove",
+    function (event) {
+
+        if (!isDrawing) {
+            return;
+        }
+
+
+        const position =
+            getMousePosition(event);
+
+
+        const currentX =
+            position.x;
+
+        const currentY =
+            position.y;
+
+
+        currentBox = {
+
+            x:
+                Math.min(
+                    startX,
+                    currentX
+                ),
+
+            y:
+                Math.min(
+                    startY,
+                    currentY
+                ),
+
+            width:
+                Math.abs(
+                    currentX - startX
+                ),
+
+            height:
+                Math.abs(
+                    currentY - startY
+                )
+
+        };
+
+
+        drawImage();
+
+    }
+);
+
+
+/* ============================================================
+   MOUSE UP
+============================================================ */
+
+canvas.addEventListener(
+    "mouseup",
+    function () {
+
+        if (!isDrawing) {
+            return;
+        }
+
+
+        isDrawing = false;
+
+
+        if (
+            currentBox &&
+            currentBox.width > 10 &&
+            currentBox.height > 10
+        ) {
+
+            boxes.push(
+                {
+                    x: currentBox.x,
+                    y: currentBox.y,
+                    width: currentBox.width,
+                    height: currentBox.height
+                }
+            );
+
+        }
+
+
+        currentBox = null;
+
+        drawImage();
+
+    }
+);
+
+
+/* ============================================================
+   AUTO ANNOTATE
+============================================================ */
+
+document
+    .getElementById("autoAnnotateBtn")
+    .addEventListener(
+        "click",
+        async function () {
+
+            const button =
+                this;
+
+            const status =
+                document.getElementById(
+                    "autoStatus"
+                );
+
+
+            button.disabled = true;
+
+
+            button.innerHTML =
+                '<i class="fas fa-spinner fa-spin"></i> Detecting faces...';
+
+
+            status.style.display =
+                "block";
+
+
+            status.className =
+                "alert alert-info mt-3";
+
+
+            status.innerHTML =
+                '<i class="fas fa-spinner fa-spin"></i> Running RetinaFace detector...';
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `/admin/test-dataset/${imageId}/auto-annotate`,
+                        {
+                            method: "POST",
+
+                            credentials: "same-origin",
+
+                            headers: {
+                                "Accept":
+                                    "application/json"
+                            }
+                        }
+                    );
+
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * Do NOT directly call response.json().
+                 *
+                 * If Flask returns HTML,
+                 * response.json() causes:
+                 *
+                 * Unexpected token '<'
+                 */
+
+                const responseText =
+                    await response.text();
+
+
+                let result;
+
+                try {
+
+                    result =
+                        JSON.parse(
+                            responseText
+                        );
+
+                }
+                catch (jsonError) {
+
+                    console.error(
+                        "AUTO ANNOTATE RESPONSE:",
+                        responseText
+                    );
+
+                    throw new Error(
+                        "Server returned HTML instead of JSON. " +
+                        "You may have been redirected to login or Flask returned an error."
+                    );
+
+                }
+
+
+                if (
+                    !response.ok ||
+                    !result.success
+                ) {
+
+                    throw new Error(
+                        result.error ||
+                        "Face detection failed"
+                    );
+
+                }
+
+
+                /*
+                 * Backend returns:
+                 *
+                 * [
+                 *   {
+                 *      x: ...,
+                 *      y: ...,
+                 *      width: ...,
+                 *      height: ...
+                 *   }
+                 * ]
+                 *
+                 * NOT:
+                 *
+                 * [x,y,w,h]
+                 */
+
+
+                if (
+                    !Array.isArray(result.boxes) ||
+                    result.boxes.length === 0
+                ) {
+
+                    boxes = [];
+
+                    drawImage();
+
+
+                    status.className =
+                        "alert alert-warning mt-3";
+
+
+                    status.innerHTML =
+                        "⚠️ No faces detected.";
+
+                }
+                else {
+
+                    boxes =
+                        result.boxes
+                            .map(function (box) {
+
+                                /*
+                                 * Handle object format.
+                                 */
+
+                                if (
+                                    typeof box === "object" &&
+                                    !Array.isArray(box)
+                                ) {
+
+                                    return {
+
+                                        x:
+                                            Number(box.x)
+                                            * scale,
+
+                                        y:
+                                            Number(box.y)
+                                            * scale,
+
+                                        width:
+                                            Number(box.width)
+                                            * scale,
+
+                                        height:
+                                            Number(box.height)
+                                            * scale
+
+                                    };
+
+                                }
+
+
+                                /*
+                                 * Also support array format
+                                 * just in case.
+                                 */
+
+                                return {
+
+                                    x:
+                                        Number(box[0])
+                                        * scale,
+
+                                    y:
+                                        Number(box[1])
+                                        * scale,
+
+                                    width:
+                                        Number(box[2])
+                                        * scale,
+
+                                    height:
+                                        Number(box[3])
+                                        * scale
+
+                                };
+
+                            })
+                            .filter(function (box) {
+
+                                return (
+                                    box.width > 0 &&
+                                    box.height > 0
+                                );
+
+                            });
+
+
+                    drawImage();
+
+
+                    status.className =
+                        "alert alert-success mt-3";
+
+
+                    status.innerHTML =
+                        `<strong>✓ ${boxes.length} faces detected.</strong>
+                         Please verify the boxes before saving.`;
+
+                }
+
+            }
+            catch (error) {
+
+                console.error(
+                    "AUTO ANNOTATE ERROR:",
+                    error
+                );
+
+
+                status.style.display =
+                    "block";
+
+
+                status.className =
+                    "alert alert-danger mt-3";
+
+
+                status.innerHTML =
+                    "❌ " +
+                    error.message;
+
+            }
+
+
+            button.disabled =
+                false;
+
+
+            button.innerHTML =
+                '<i class="fas fa-magic"></i> Auto Annotate Faces';
+
+        }
+    );
+
+
+/* ============================================================
+   CLEAR ALL
+============================================================ */
+
+document
+    .getElementById("clearBtn")
+    .addEventListener(
+        "click",
+        function () {
+
+            if (
+                confirm(
+                    "Clear all annotations?"
+                )
+            ) {
+
+                boxes = [];
+
+                drawImage();
+
+            }
+
+        }
+    );
+
+
+/* ============================================================
+   UNDO
+============================================================ */
+
+document
+    .getElementById("undoBtn")
+    .addEventListener(
+        "click",
+        function () {
+
+            if (
+                boxes.length > 0
+            ) {
+
+                boxes.pop();
+
+                drawImage();
+
+            }
+
+        }
+    );
+
+
+/* ============================================================
+   SAVE ANNOTATIONS
+============================================================ */
+
+document
+    .getElementById("saveBtn")
+    .addEventListener(
+        "click",
+        async function () {
+
+            const saveBtn =
+                this;
+
+
+            /*
+             * Cannot save zero boxes.
+             */
+
+            if (
+                boxes.length === 0
+            ) {
+
+                alert(
+                    "Please add at least one face."
+                );
+
+                return;
+
+            }
+
+
+            saveBtn.disabled =
+                true;
+
+
+            saveBtn.innerHTML =
+                '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+
+            /*
+             * Convert canvas coordinates
+             * back to ORIGINAL IMAGE coordinates.
+             */
+
+            const originalBoxes =
+                boxes.map(function (box) {
+
+                    return {
+
+                        x:
+                            Math.round(
+                                box.x / scale
+                            ),
+
+                        y:
+                            Math.round(
+                                box.y / scale
+                            ),
+
+                        width:
+                            Math.round(
+                                box.width / scale
+                            ),
+
+                        height:
+                            Math.round(
+                                box.height / scale
+                            )
+
+                    };
+
+                });
+
+
+            console.log(
+                "Saving annotations:",
+                originalBoxes
+            );
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `/admin/test-dataset/${imageId}/annotate`,
+                        {
+                            method: "POST",
+
+                            credentials:
+                                "same-origin",
+
+                            headers: {
+
+                                "Content-Type":
+                                    "application/json",
+
+                                "Accept":
+                                    "application/json"
+
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    boxes:
+                                        originalBoxes
+                                })
+
+                        }
+                    );
+
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * Read text first.
+                 *
+                 * This prevents:
+                 *
+                 * Unexpected token '<'
+                 */
+
+                const responseText =
+                    await response.text();
+
+
+                console.log(
+                    "SAVE RESPONSE STATUS:",
+                    response.status
+                );
+
+
+                console.log(
+                    "SAVE RESPONSE:",
+                    responseText
+                );
+
+
+                let result;
+
+                try {
+
+                    result =
+                        JSON.parse(
+                            responseText
+                        );
+
+                }
+                catch (jsonError) {
+
+                    /*
+                     * Flask returned HTML.
+                     */
+
+                    console.error(
+                        "SERVER RETURNED NON-JSON:",
+                        responseText
+                    );
+
+
+                    if (
+                        response.status === 302 ||
+                        response.status === 401 ||
+                        response.status === 403
+                    ) {
+
+                        throw new Error(
+                            "Your login session has expired. Please login again."
+                        );
+
+                    }
+
+
+                    throw new Error(
+                        "Server returned an HTML error page instead of JSON. " +
+                        "Check the Flask terminal for the actual error."
+                    );
+
+                }
+
+
+                /*
+                 * Check HTTP status.
+                 */
+
+                if (
+                    !response.ok
+                ) {
+
+                    throw new Error(
+                        result.error ||
+                        result.message ||
+                        `Server error (${response.status})`
+                    );
+
+                }
+
+
+                /*
+                 * Check Flask success.
+                 */
+
+                if (
+                    !result.success
+                ) {
+
+                    throw new Error(
+                        result.error ||
+                        "Failed to save annotations."
+                    );
+
+                }
+
+
+                /*
+                 * SUCCESS
+                 */
+
+                alert(
+                    `${originalBoxes.length} ground-truth face annotations saved successfully!`
+                );
+
+
+                window.location.href =
+                    "{{ url_for('admin.test_dataset') }}";
+
+            }
+            catch (error) {
+
+                console.error(
+                    "SAVE ERROR:",
+                    error
+                );
+
+
+                alert(
+                    "Error saving annotations:\n\n" +
+                    error.message
+                );
+
+
+                saveBtn.disabled =
+                    false;
+
+
+                saveBtn.innerHTML =
+                    '<i class="fas fa-save"></i> Save Annotations';
+
+            }
+
+        }
+    );
+
+
+/* ============================================================
+   UPDATE COUNT
+============================================================ */
+
+function updateBoxCount() {
+
+    const countElement =
+        document.getElementById(
+            "boxCount"
+        );
+
+
+    countElement.textContent =
+        boxes.length;
+
+
+    const boxList =
+        document.getElementById(
+            "boxList"
+        );
+
+
+    boxList.innerHTML = "";
+
+
+    boxes.forEach(
+        function (box, index) {
+
+            const item =
+                document.createElement(
+                    "div"
+                );
+
+
+            item.className =
+                "alert alert-success py-2 mb-2";
+
+
+            /*
+             * Convert canvas coordinates
+             * back to original image coordinates.
+             */
+
+            const origX =
+                Math.round(
+                    box.x / scale
+                );
+
+
+            const origY =
+                Math.round(
+                    box.y / scale
+                );
+
+
+            const origW =
+                Math.round(
+                    box.width / scale
+                );
+
+
+            const origH =
+                Math.round(
+                    box.height / scale
+                );
+
+
+            item.innerHTML =
+
+                `<small>
+                    <strong>Face ${index + 1}:</strong>
+                    (${origX}, ${origY},
+                    ${origW}, ${origH})
+                </small>`;
+
+
+            boxList.appendChild(
+                item
+            );
+
+        }
+    );
+
+}
+
+</script>
+
+{% endblock %}

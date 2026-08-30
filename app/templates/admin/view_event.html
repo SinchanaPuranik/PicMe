@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.name }} - PICME{% endblock %}
+
+{% block extra_css %}
+<style>
+.delete-photo-btn {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    transition: all 0.2s ease-in-out;
+}
+
+.delete-photo-btn:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.delete-photo-btn:active {
+    background-color: #bd2130;
+    border-color: #b21f2d;
+    transform: translateY(0);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="fas fa-calendar"></i> {{ event.name }}</h2>
+        <p class="text-muted mb-0">{{ event.event_date.strftime('%B %d, %Y') }} | {{ event.location or 'No location' }}</p>
+    </div>
+    <a href="{{ url_for('admin.upload_photos', event_id=event.id) }}" class="btn btn-primary">
+        <i class="fas fa-upload"></i> Upload Photos
+    </a>
+</div>
+
+<!-- Event Details Card -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5>Description</h5>
+                <p>{{ event.description or 'No description provided' }}</p>
+                
+                <hr>
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Total Photos:</strong> {{ photos|length }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Processed:</strong> {{ photos|selectattr('processed')|list|length }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Status:</strong>
+                        {% if event.is_active %}
+                        <span class="badge bg-success">Active</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5>Event QR Code</h5>
+                {% if event.qr_code_path %}
+                <img src="{{ url_for('static', filename='uploads/events/' + event.qr_code_path) }}" 
+                     alt="QR Code" 
+                     class="img-fluid"
+                     style="max-width: 200px;">
+                <p class="small text-muted mt-2">Scan to access event</p>
+                {% else %}
+                <p class="text-muted">No QR code generated</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Photos Grid -->
+<div class="card shadow">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-images"></i> Event Photos</h5>
+        {% if photos|selectattr('processed', 'equalto', False)|list|length > 0 %}
+        <a href="{{ url_for('admin.process_photos', event_id=event.id) }}" class="btn btn-warning btn-sm">
+            <i class="fas fa-cog"></i> Process Unprocessed Photos
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if photos %}
+        <div class="row g-3">
+            {% for photo in photos %}
+            <div class="col-md-3">
+                <div class="card h-100">
+                    <img src="{{ url_for('static', filename='uploads/events/' + event.id|string + '/' + photo.filename) }}" 
+                         class="card-img-top" 
+                         alt="{{ photo.filename }}"
+                         style="height: 200px; object-fit: cover;">
+                    <div class="card-body p-2">
+                        <small class="text-muted d-block">
+                            {{ photo.uploaded_at.strftime('%Y-%m-%d %H:%M') }}
+                        </small>
+                        {% if photo.processed %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-check"></i> {{ photo.num_faces }} face(s)
+                        </span>
+                        {% else %}
+                        <span class="badge bg-warning">Pending</span>
+                        {% endif %}
+                        
+                        <!-- DELETE BUTTON -->
+                        <button class="btn btn-danger btn-sm delete-photo-btn w-100 mt-2" 
+                                data-photo-id="{{ photo.id }}"
+                                data-photo-filename="{{ photo.filename }}"
+                                aria-label="Delete photo {{ photo.filename }}">
+                            <i class="fas fa-trash" aria-hidden="true"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-image fa-4x text-muted mb-3"></i>
+            <h5 class="text-muted">No photos uploaded yet</h5>
+            <a href="{{ url_for('admin.upload_photos', event_id=event.id) }}" class="btn btn-primary mt-3">
+                <i class="fas fa-upload"></i> Upload Photos
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deletePhotoModal" tabindex="-1" aria-labelledby="deletePhotoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deletePhotoModalLabel">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> Confirm Photo Deletion
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="deletePhotoFilename" class="text-danger"></strong>?</p>
+                <p class="text-danger mb-0">
+                    <i class="fas fa-exclamation-circle"></i> 
+                    <strong>This action cannot be undone.</strong> 
+                    The photo and all associated face recognition data will be permanently removed.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i> Delete Photo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Get CSRF token from meta tag
+    const csrfToken = $('meta[name=csrf-token]').attr('content');
+    
+    // State variables
+    let currentPhotoId = null;
+    let currentPhotoCard = null;
+    
+    // Delete button click handler - show confirmation modal
+    $('.delete-photo-btn').on('click', function() {
+        currentPhotoId = $(this).data('photo-id');
+        currentPhotoCard = $(this).closest('.col-md-3');
+        const filename = $(this).data('photo-filename');
+        
+        $('#deletePhotoFilename').text(filename);
+        $('#deletePhotoModal').modal('show');
+    });
+    
+    // Confirm delete button handler - execute deletion
+    $('#confirmDeleteBtn').on('click', function() {
+        if (!currentPhotoId) {
+            return;
+        }
+        
+        // Disable button to prevent double-clicks
+        $(this).prop('disabled', true);
+        
+        // Send DELETE request
+        $.ajax({
+            url: `/admin/photos/${currentPhotoId}/delete`,
+            type: 'DELETE',
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            success: function(response) {
+                // Hide modal
+                $('#deletePhotoModal').modal('hide');
+                
+                // Remove photo card with fade animation
+                currentPhotoCard.fadeOut(300, function() {
+                    $(this).remove();
+                    
+                    // Update photo count or show empty state
+                    updatePhotoDisplay();
+                });
+                
+                // Show success message
+                showAlert('success', response.message || 'Photo deleted successfully');
+                
+                // Reset state
+                currentPhotoId = null;
+                currentPhotoCard = null;
+            },
+            error: function(xhr, status, error) {
+                // Hide modal
+                $('#deletePhotoModal').modal('hide');
+                
+                // Determine error message
+                let errorMsg = 'Failed to delete photo';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                } else if (xhr.status === 404) {
+                    errorMsg = 'Photo not found';
+                } else if (xhr.status === 403) {
+                    errorMsg = 'You do not have permission to delete photos';
+                } else if (status === 'timeout') {
+                    errorMsg = 'Request timed out. Please try again.';
+                } else if (status === 'error' && xhr.status === 0) {
+                    errorMsg = 'Network error. Please check your connection.';
+                }
+                
+                // Show error message
+                showAlert('danger', errorMsg);
+                
+                // Reset state
+                currentPhotoId = null;
+                currentPhotoCard = null;
+            },
+            complete: function() {
+                // Re-enable button
+                $('#confirmDeleteBtn').prop('disabled', false);
+            }
+        });
+    });
+    
+    // Cancel or close modal - reset state
+    $('#deletePhotoModal').on('hidden.bs.modal', function() {
+        currentPhotoId = null;
+        currentPhotoCard = null;
+        $('#confirmDeleteBtn').prop('disabled', false);
+    });
+    
+    // Helper function to show Bootstrap alerts
+    function showAlert(type, message) {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        
+        // Insert at top of main content
+        $('main.container').prepend(alertHtml);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(function() {
+            $('.alert').fadeOut(300, function() {
+                $(this).remove();
+            });
+        }, 5000);
+    }
+    
+    // Helper function to update photo display after deletion
+    function updatePhotoDisplay() {
+        const remainingPhotos = $('.col-md-3').length;
+        
+        // Update photo count statistics
+        updatePhotoCount();
+        
+        // If no photos remain, show empty state
+        if (remainingPhotos === 0) {
+            const emptyStateHtml = `
+                <div class="text-center py-5">
+                    <i class="fas fa-image fa-4x text-muted mb-3"></i>
+                    <h5 class="text-muted">No photos uploaded yet</h5>
+                    <a href="{{ url_for('admin.upload_photos', event_id=event.id) }}" class="btn btn-primary mt-3">
+                        <i class="fas fa-upload"></i> Upload Photos
+                    </a>
+                </div>
+            `;
+            $('.card-body .row.g-3').replaceWith(emptyStateHtml);
+        }
+    }
+    
+    // Helper function to update photo count statistics
+    function updatePhotoCount() {
+        const totalPhotos = $('.col-md-3').length;
+        const processedPhotos = $('.badge.bg-success').length;
+        
+        // Update count displays (if they exist on page)
+        const countElements = $('.card-body .row .col-md-4');
+        if (countElements.length >= 2) {
+            $(countElements[0]).find('strong').text('Total Photos: ');
+            $(countElements[0]).contents().filter(function() {
+                return this.nodeType === 3;
+            }).last().replaceWith(totalPhotos);
+            
+            $(countElements[1]).find('strong').text('Processed: ');
+            $(countElements[1]).contents().filter(function() {
+                return this.nodeType === 3;
+            }).last().replaceWith(processedPhotos);
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1354 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Performance & Evaluation Metrics - PICME{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="fas fa-chart-line"></i>
+        Performance & Evaluation Metrics
+    </h2>
+
+    <div>
+        {% if has_evaluation_data %}
+        <a href="{{ url_for('admin.evaluation_history') }}" class="btn btn-info">
+            <i class="fas fa-history"></i> View History
+        </a>
+        {% endif %}
+
+        <button class="btn btn-success" onclick="runEvaluation()" id="runEvalBtn">
+            <i class="fas fa-play"></i> Run Evaluation
+        </button>
+
+        <a href="{{ url_for('admin.test_dataset') }}" class="btn btn-warning">
+            <i class="fas fa-images"></i> Test Dataset
+        </a>
+
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+    </div>
+</div>
+
+
+{% if not has_evaluation_data %}
+
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle"></i>
+
+    <strong>No Evaluation Data:</strong>
+    Click "Run Evaluation" to test detectors on your test dataset.
+
+    {% if num_test_images == 0 %}
+    <br>
+    If you don't have a test dataset yet,
+    <a href="{{ url_for('admin.test_dataset') }}">
+        upload test images
+    </a>
+    {% endif %}
+</div>
+
+{% else %}
+
+<div class="alert alert-success">
+
+    <i class="fas fa-check-circle"></i>
+
+    <strong>Real Evaluation Data:</strong>
+
+    Showing actual performance metrics from
+    {{ num_test_images }} test images.
+
+    {% if best_detector_name and detector_results[best_detector_name] %}
+    <br>
+    Last updated:
+    {{ detector_results[best_detector_name]['timestamp'].strftime('%Y-%m-%d %H:%M')
+       if detector_results[best_detector_name].get('timestamp')
+       else 'N/A' }}
+    {% endif %}
+
+</div>
+
+{% endif %}
+
+
+
+<!-- ========================================================= -->
+<!-- PERFORMANCE SUMMARY -->
+<!-- ========================================================= -->
+
+<div class="row mb-4">
+
+    <div class="col-md-3">
+        <div class="card {% if best_detector_name %}bg-success{% else %}bg-secondary{% endif %} text-white">
+
+            <div class="card-body text-center">
+
+                <h6 class="text-uppercase">
+                    Best Detector F1
+                </h6>
+
+                <h2 class="mb-0">
+                    {{ best_f1_score }}%
+                </h2>
+
+                <small>
+                    {{ best_detector_name|upper if best_detector_name else 'No Data' }}
+                </small>
+
+            </div>
+        </div>
+    </div>
+
+
+    <div class="col-md-3">
+
+        <div class="card bg-info text-white">
+
+            <div class="card-body text-center">
+
+                <h6 class="text-uppercase">
+                    Avg Processing
+                </h6>
+
+                <h2 class="mb-0">
+                    {{ avg_processing }}s
+                </h2>
+
+                <small>
+                    Per Image
+                </small>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-md-3">
+
+        <div class="card bg-primary text-white">
+
+            <div class="card-body text-center">
+
+                <h6 class="text-uppercase">
+                    Images Tested
+                </h6>
+
+                <h2 class="mb-0">
+                    {{ num_test_images }}
+                </h2>
+
+                <small>
+                    Test Images
+                </small>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="col-md-3">
+
+        <div class="card bg-warning text-dark">
+
+            <div class="card-body text-center">
+
+                <h6 class="text-uppercase">
+                    Total Searches
+                </h6>
+
+                <h2 class="mb-0">
+                    {{ total_searches }}
+                </h2>
+
+                <small>
+                    Performed
+                </small>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- ========================================================= -->
+<!-- DETECTOR PERFORMANCE MATRIX -->
+<!-- ========================================================= -->
+
+<div class="card shadow mb-4">
+
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+
+        <h5 class="mb-0">
+            <i class="fas fa-eye"></i>
+            Face Detector Performance Matrix
+        </h5>
+
+        {% if has_evaluation_data %}
+
+        <span class="badge bg-success">
+            Real Data
+        </span>
+
+        {% else %}
+
+        <span class="badge bg-secondary">
+            No Data
+        </span>
+
+        {% endif %}
+
+    </div>
+
+
+    <div class="card-body">
+
+        <div class="alert alert-info">
+
+            <strong>Evaluation Settings</strong><br>
+
+            IoU Threshold:
+            <strong>0.5</strong>
+
+            &nbsp; | &nbsp;
+
+            Confidence Threshold:
+            <strong>0.3</strong>
+
+        </div>
+
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover">
+
+                <thead class="table-light">
+
+                    <tr>
+
+                        <th>Detector</th>
+                        <th>Avg Speed (s)</th>
+                        <th>Precision (%)</th>
+                        <th>Recall (%)</th>
+                        <th>F1-Score (%)</th>
+                        <th>Accuracy (%)</th>
+                        <th>TP</th>
+                        <th>FP</th>
+                        <th>FN</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    {% for detector_name in ['mtcnn', 'haar', 'dnn', 'retinaface'] %}
+
+                    {% set data = detector_results.get(detector_name) %}
+
+
+                    <tr
+                        {% if data and data.f1_score == best_f1_score %}
+                        class="table-success"
+                        {% endif %}
+                    >
+
+                        <td>
+
+                            <span class="badge
+                                {% if detector_name == 'mtcnn' %}
+                                    bg-primary
+                                {% elif detector_name == 'haar' %}
+                                    bg-secondary
+                                {% elif detector_name == 'dnn' %}
+                                    bg-dark
+                                {% else %}
+                                    bg-danger
+                                {% endif %}
+                            ">
+
+                                {{ detector_name|upper }}
+
+                            </span>
+
+
+                            {% if data and data.f1_score == best_f1_score %}
+
+                            <i
+                                class="fas fa-trophy text-warning ms-2"
+                                title="Best F1-Score">
+                            </i>
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <td>
+
+                            {% if data %}
+                            {{ '%.3f'|format(data.avg_speed) }}
+                            {% else %}
+                            N/A
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- PRECISION -->
+
+                        <td>
+
+                            {% if data %}
+
+                            <div class="progress" style="height: 20px;">
+
+                                <div
+                                    class="progress-bar
+                                    {% if data.precision >= 90 %}
+                                        bg-success
+                                    {% elif data.precision >= 70 %}
+                                        bg-info
+                                    {% else %}
+                                        bg-warning
+                                    {% endif %}"
+                                    role="progressbar"
+                                    style="width: {{ data.precision }}%;"
+                                >
+
+                                    {{ '%.1f'|format(data.precision) }}%
+
+                                </div>
+
+                            </div>
+
+                            {% else %}
+
+                            N/A
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- RECALL -->
+
+                        <td>
+
+                            {% if data %}
+
+                            <div class="progress" style="height: 20px;">
+
+                                <div
+                                    class="progress-bar
+                                    {% if data.recall >= 90 %}
+                                        bg-success
+                                    {% elif data.recall >= 70 %}
+                                        bg-info
+                                    {% else %}
+                                        bg-warning
+                                    {% endif %}"
+                                    role="progressbar"
+                                    style="width: {{ data.recall }}%;"
+                                >
+
+                                    {{ '%.1f'|format(data.recall) }}%
+
+                                </div>
+
+                            </div>
+
+                            {% else %}
+
+                            N/A
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- F1 -->
+
+                        <td>
+
+                            {% if data %}
+
+                            <strong>
+                                {{ '%.1f'|format(data.f1_score) }}%
+                            </strong>
+
+                            {% else %}
+
+                            N/A
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- ACCURACY -->
+
+                        <td>
+
+                            {% if data %}
+
+                            <div class="progress" style="height: 20px;">
+
+                                <div
+                                    class="progress-bar
+                                    {% if data.accuracy >= 90 %}
+                                        bg-success
+                                    {% elif data.accuracy >= 70 %}
+                                        bg-info
+                                    {% else %}
+                                        bg-warning
+                                    {% endif %}"
+                                    role="progressbar"
+                                    style="width: {{ data.accuracy }}%;"
+                                >
+
+                                    {{ '%.1f'|format(data.accuracy) }}%
+
+                                </div>
+
+                            </div>
+
+                            {% else %}
+
+                            N/A
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <!-- TP -->
+
+                        <td>
+
+                            <span class="badge bg-success">
+
+                                {{ data.true_positives if data else 'N/A' }}
+
+                            </span>
+
+                        </td>
+
+
+                        <!-- FP -->
+
+                        <td>
+
+                            <span class="badge bg-danger">
+
+                                {{ data.false_positives if data else 'N/A' }}
+
+                            </span>
+
+                        </td>
+
+
+                        <!-- FN -->
+
+                        <td>
+
+                            <span class="badge bg-warning">
+
+                                {{ data.false_negatives if data else 'N/A' }}
+
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+
+        {% if has_evaluation_data %}
+
+        <div class="mt-4">
+
+            <h6>
+                Detector Comparison
+            </h6>
+
+            <canvas
+                id="detectorChart"
+                height="100">
+            </canvas>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+
+
+<!-- ========================================================= -->
+<!-- RECOGNITION MODEL MATRIX -->
+<!-- ========================================================= -->
+
+<div class="card shadow mb-4">
+
+    <div class="card-header bg-info text-white">
+
+        <h5 class="mb-0">
+
+            <i class="fas fa-robot"></i>
+
+            Face Recognition Model Performance
+
+        </h5>
+
+    </div>
+
+
+    <div class="card-body">
+
+        <div class="alert alert-warning">
+
+            <strong>Note:</strong>
+
+            FaceNet and ArcFace values shown below are currently
+            example/placeholder values. Replace them with real
+            recognition evaluation results before using them in
+            your final report.
+
+        </div>
+
+
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-hover">
+
+                <thead class="table-light">
+
+                    <tr>
+
+                        <th>Model</th>
+                        <th>Precision (%)</th>
+                        <th>Recall (%)</th>
+                        <th>F1-Score (%)</th>
+                        <th>False Positives</th>
+                        <th>False Negatives</th>
+                        <th>Speed</th>
+                        <th>Embedding</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    <tr>
+
+                        <td>
+                            <span class="badge bg-primary">
+                                FaceNet
+                            </span>
+                        </td>
+
+                        <td>91.2%</td>
+                        <td>89.7%</td>
+                        <td>90.4%</td>
+                        <td>15</td>
+                        <td>18</td>
+                        <td>45 ms</td>
+                        <td>128D</td>
+
+                    </tr>
+
+
+                    <tr class="table-success">
+
+                        <td>
+                            <span class="badge bg-info">
+                                ArcFace
+                            </span>
+                        </td>
+
+                        <td>96.3%</td>
+                        <td>95.1%</td>
+                        <td>95.7%</td>
+                        <td>7</td>
+                        <td>9</td>
+                        <td>68 ms</td>
+                        <td>512D</td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- ========================================================= -->
+<!-- SEARCH STATISTICS -->
+<!-- ========================================================= -->
+
+<div class="card shadow mb-4">
+
+    <div class="card-header bg-warning text-dark">
+
+        <h5 class="mb-0">
+
+            <i class="fas fa-search"></i>
+
+            Real-time Search Statistics
+
+        </h5>
+
+    </div>
+
+
+    <div class="card-body">
+
+        <div class="row text-center mb-4">
+
+
+            <div class="col-md-4">
+
+                <div class="border rounded p-3">
+
+                    <h3
+                        class="text-primary"
+                        id="total-searches-stat">
+
+                        {{ total_searches }}
+
+                    </h3>
+
+                    <p class="mb-0">
+                        Total Searches
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="col-md-4">
+
+                <div class="border rounded p-3">
+
+                    <h3
+                        class="text-success"
+                        id="avg-matches">
+
+                        {{ avg_matches }}
+
+                    </h3>
+
+                    <p class="mb-0">
+                        Avg Matches/Search
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="col-md-4">
+
+                <div class="border rounded p-3">
+
+                    <h3
+                        class="text-info"
+                        id="avg-time">
+
+                        {{ avg_time }}ms
+
+                    </h3>
+
+                    <p class="mb-0">
+                        Avg Processing Time
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <canvas
+            id="searchHistoryChart"
+            height="100">
+        </canvas>
+
+    </div>
+
+</div>
+
+
+
+<!-- ========================================================= -->
+<!-- METRIC DEFINITIONS -->
+<!-- ========================================================= -->
+
+<div class="card shadow">
+
+    <div class="card-header bg-light">
+
+        <h5 class="mb-0">
+
+            <i class="fas fa-book"></i>
+
+            Metric Definitions
+
+        </h5>
+
+    </div>
+
+
+    <div class="card-body">
+
+        <div class="row">
+
+
+            <div class="col-md-6">
+
+                <h6 class="text-primary">
+                    Accuracy Metrics
+                </h6>
+
+                <dl>
+
+                    <dt>Precision</dt>
+
+                    <dd>
+                        TP / (TP + FP)
+                    </dd>
+
+
+                    <dt>Recall</dt>
+
+                    <dd>
+                        TP / (TP + FN)
+                    </dd>
+
+
+                    <dt>F1-Score</dt>
+
+                    <dd>
+                        Harmonic mean of Precision and Recall.
+                    </dd>
+
+
+                    <dt>IoU</dt>
+
+                    <dd>
+                        Intersection over Union between the
+                        predicted bounding box and ground-truth
+                        bounding box.
+                    </dd>
+
+                </dl>
+
+            </div>
+
+
+            <div class="col-md-6">
+
+                <h6 class="text-info">
+                    Error Metrics
+                </h6>
+
+                <dl>
+
+                    <dt>True Positive</dt>
+
+                    <dd>
+                        A predicted face correctly matched to a
+                        ground-truth face.
+                    </dd>
+
+
+                    <dt>False Positive</dt>
+
+                    <dd>
+                        A predicted face that does not match a
+                        ground-truth face.
+                    </dd>
+
+
+                    <dt>False Negative</dt>
+
+                    <dd>
+                        A ground-truth face that was not detected.
+                    </dd>
+
+
+                    <dt>IoU Threshold</dt>
+
+                    <dd>
+                        This evaluation uses
+                        <strong>IoU ≥ 0.5</strong>
+                        as the matching criterion.
+                    </dd>
+
+                </dl>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+
+{% block extra_js %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!--
+    IMPORTANT:
+    Put backend detector data into JSON.
+    This prevents VS Code from interpreting Jinja
+    expressions directly as JavaScript.
+-->
+
+<script type="application/json" id="detector-data">
+
+{% if has_evaluation_data %}
+
+{
+    "mtcnn": {{ detector_results.mtcnn|tojson if detector_results.mtcnn else 'null' }},
+    "haar": {{ detector_results.haar|tojson if detector_results.haar else 'null' }},
+    "dnn": {{ detector_results.dnn|tojson if detector_results.dnn else 'null' }},
+    "retinaface": {{ detector_results.retinaface|tojson if detector_results.retinaface else 'null' }}
+}
+
+{% else %}
+
+{
+    "mtcnn": null,
+    "haar": null,
+    "dnn": null,
+    "retinaface": null
+}
+
+{% endif %}
+
+</script>
+
+
+
+<script>
+
+/* =========================================================
+   CHART DEFAULTS
+   ========================================================= */
+
+Chart.defaults.font.family =
+    "'Segoe UI', Roboto, 'Helvetica Neue', Arial";
+
+Chart.defaults.responsive = true;
+
+Chart.defaults.maintainAspectRatio = true;
+
+
+
+/* =========================================================
+   GET DETECTOR DATA
+   ========================================================= */
+
+let detectorData = {
+    mtcnn: null,
+    haar: null,
+    dnn: null,
+    retinaface: null
+};
+
+const detectorDataElement =
+    document.getElementById("detector-data");
+
+if (detectorDataElement) {
+
+    try {
+
+        detectorData =
+            JSON.parse(detectorDataElement.textContent);
+
+    } catch (error) {
+
+        console.error(
+            "Could not parse detector data:",
+            error
+        );
+
+    }
+
+}
+
+
+
+/* =========================================================
+   DETECTOR PERFORMANCE CHART
+   ========================================================= */
+
+const detectorCanvas =
+    document.getElementById("detectorChart");
+
+if (detectorCanvas) {
+
+    const detectorCtx =
+        detectorCanvas.getContext("2d");
+
+
+    new Chart(detectorCtx, {
+
+        type: "bar",
+
+        data: {
+
+            labels: [
+                "MTCNN",
+                "Haar",
+                "DNN",
+                "RetinaFace"
+            ],
+
+            datasets: [
+
+                {
+
+                    label:
+                        "Speed (seconds)",
+
+                    data: [
+
+                        detectorData.mtcnn
+                            ? detectorData.mtcnn.avg_speed
+                            : 0,
+
+                        detectorData.haar
+                            ? detectorData.haar.avg_speed
+                            : 0,
+
+                        detectorData.dnn
+                            ? detectorData.dnn.avg_speed
+                            : 0,
+
+                        detectorData.retinaface
+                            ? detectorData.retinaface.avg_speed
+                            : 0
+
+                    ],
+
+                    yAxisID: "y"
+
+                },
+
+
+                {
+
+                    label:
+                        "F1-Score (%)",
+
+                    data: [
+
+                        detectorData.mtcnn
+                            ? detectorData.mtcnn.f1_score
+                            : 0,
+
+                        detectorData.haar
+                            ? detectorData.haar.f1_score
+                            : 0,
+
+                        detectorData.dnn
+                            ? detectorData.dnn.f1_score
+                            : 0,
+
+                        detectorData.retinaface
+                            ? detectorData.retinaface.f1_score
+                            : 0
+
+                    ],
+
+                    yAxisID: "y1"
+
+                }
+
+            ]
+
+        },
+
+
+        options: {
+
+            scales: {
+
+                y: {
+
+                    beginAtZero: true,
+
+                    position: "left",
+
+                    title: {
+
+                        display: true,
+
+                        text: "Speed (seconds)"
+
+                    }
+
+                },
+
+
+                y1: {
+
+                    beginAtZero: true,
+
+                    max: 100,
+
+                    position: "right",
+
+                    title: {
+
+                        display: true,
+
+                        text: "F1-Score (%)"
+
+                    },
+
+                    grid: {
+
+                        drawOnChartArea: false
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    });
+
+}
+
+
+
+/* =========================================================
+   SEARCH HISTORY CHART
+   ========================================================= */
+
+const searchCanvas =
+    document.getElementById("searchHistoryChart");
+
+if (searchCanvas) {
+
+    const searchCtx =
+        searchCanvas.getContext("2d");
+
+
+    new Chart(searchCtx, {
+
+        type: "line",
+
+        data: {
+
+            labels: [
+                "Search 1",
+                "Search 2",
+                "Search 3",
+                "Search 4",
+                "Search 5"
+            ],
+
+            datasets: [
+
+                {
+
+                    label:
+                        "Processing Time (ms)",
+
+                    data: [
+                        250,
+                        230,
+                        240,
+                        235,
+                        245
+                    ],
+
+                    tension: 0.4
+
+                },
+
+
+                {
+
+                    label:
+                        "Matches Found",
+
+                    data: [
+                        5,
+                        7,
+                        6,
+                        8,
+                        7
+                    ],
+
+                    tension: 0.4,
+
+                    yAxisID: "y1"
+
+                }
+
+            ]
+
+        },
+
+
+        options: {
+
+            scales: {
+
+                y: {
+
+                    beginAtZero: true,
+
+                    position: "left",
+
+                    title: {
+
+                        display: true,
+
+                        text: "Time (ms)"
+
+                    }
+
+                },
+
+
+                y1: {
+
+                    beginAtZero: true,
+
+                    position: "right",
+
+                    title: {
+
+                        display: true,
+
+                        text: "Matches"
+
+                    },
+
+                    grid: {
+
+                        drawOnChartArea: false
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    });
+
+}
+
+
+
+/* =========================================================
+   RUN DETECTOR EVALUATION
+   ========================================================= */
+
+function runEvaluation() {
+
+    const btn =
+        document.getElementById("runEvalBtn");
+
+
+    if (!btn) {
+        return;
+    }
+
+
+    btn.disabled = true;
+
+
+    btn.innerHTML =
+        '<i class="fas fa-spinner fa-spin"></i> Running Evaluation...';
+
+
+    fetch(
+        "{{ url_for('admin.run_evaluation') }}",
+        {
+
+            method: "POST",
+
+            headers: {
+
+                "Content-Type":
+                    "application/json"
+
+            },
+
+            body: JSON.stringify({
+
+                detector: "all",
+
+                /*
+                 * IMPORTANT:
+                 * IoU threshold (Intersection over Union)
+                 * 0.5 = 50% overlap required for match
+                 */
+
+                iou_threshold: 0.5,
+
+                /*
+                 * Confidence threshold for face detection
+                 * 0.3 = detectors 30% confident or higher (lower = more faces detected)
+                 */
+
+                confidence_threshold: 0.3,
+
+                dataset_name: "default"
+
+            })
+
+        }
+
+    )
+
+
+    .then(response => {
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Server returned HTTP " +
+                response.status
+            );
+
+        }
+
+        return response.json();
+
+    })
+
+
+    .then(data => {
+
+        console.log(
+            "Evaluation response:",
+            data
+        );
+
+
+        if (data.success) {
+
+            alert(
+
+                "Evaluation Complete!\n\n" +
+
+                "Images Tested: " +
+                (data.num_images ?? "N/A") +
+
+                "\nGround Truth Faces: " +
+                (data.num_ground_truth_faces ?? "N/A") +
+
+                "\nIoU Threshold: " +
+                (data.iou_threshold ?? 0.5) +
+
+                "\n\nResults saved. Refreshing page..."
+
+            );
+
+
+            location.reload();
+
+        }
+
+
+        else {
+
+            alert(
+
+                "Evaluation Failed:\n" +
+
+                (data.error || "Unknown error") +
+
+                "\n\n" +
+
+                (data.message || "")
+
+            );
+
+
+            btn.disabled = false;
+
+
+            btn.innerHTML =
+                '<i class="fas fa-play"></i> Run Evaluation';
+
+        }
+
+    })
+
+
+    .catch(error => {
+
+        console.error(
+            "Evaluation error:",
+            error
+        );
+
+
+        alert(
+            "Evaluation Error:\n" +
+            error.message
+        );
+
+
+        btn.disabled = false;
+
+
+        btn.innerHTML =
+            '<i class="fas fa-play"></i> Run Evaluation';
+
+    });
+
+}
+
+</script>
+
+{% endblock %}

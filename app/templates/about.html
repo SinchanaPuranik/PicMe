@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}About - PICME{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h1 class="text-center mb-4"><i class="fas fa-info-circle"></i> About PICME</h1>
+        
+        <div class="card shadow mb-4">
+            <div class="card-body p-4">
+                <h3>What is PICME?</h3>
+                <p>
+                    PICME is an AI-powered photo retrieval system that uses advanced face recognition 
+                    technology to help event attendees find their photos quickly and easily. Simply 
+                    capture a selfie, and our AI will find all photos containing your face from the event.
+                </p>
+            </div>
+        </div>
+        
+        <div class="card shadow mb-4">
+            <div class="card-body p-4">
+                <h3><i class="fas fa-robot"></i> Technology Stack</h3>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h5>Backend</h5>
+                        <ul>
+                            <li>Flask (Python Web Framework)</li>
+                            <li>PostgreSQL Database</li>
+                            <li>SQLAlchemy ORM</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>AI/ML</h5>
+                        <ul>
+                            <li>MTCNN (Face Detection)</li>
+                            <li>FaceNet (Face Recognition)</li>
+                            <li>ArcFace (Face Recognition)</li>
+                            <li>TensorFlow & PyTorch</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow mb-4">
+            <div class="card-body p-4">
+                <h3><i class="fas fa-cogs"></i> How It Works</h3>
+                <ol class="mt-3">
+                    <li class="mb-3">
+                        <strong>Event Creation:</strong> Admins create events and upload photos
+                    </li>
+                    <li class="mb-3">
+                        <strong>Face Detection:</strong> MTCNN detects all faces in uploaded photos
+                    </li>
+                    <li class="mb-3">
+                        <strong>Embedding Generation:</strong> FaceNet and ArcFace generate unique face embeddings
+                    </li>
+                    <li class="mb-3">
+                        <strong>Face Matching:</strong> When users upload a selfie, the system compares it with stored embeddings
+                    </li>
+                    <li class="mb-3">
+                        <strong>Photo Retrieval:</strong> Matching photos are returned with similarity scores
+                    </li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="card shadow mb-4">
+            <div class="card-body p-4">
+                <h3><i class="fas fa-brain"></i> AI Models Comparison</h3>
+                <table class="table table-bordered mt-3">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>FaceNet</th>
+                            <th>ArcFace</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Embedding Size</td>
+                            <td>128 dimensions</td>
+                            <td>512 dimensions</td>
+                        </tr>
+                        <tr>
+                            <td>Speed</td>
+                            <td>Fast</td>
+                            <td>Moderate</td>
+                        </tr>
+                        <tr>
+                            <td>Accuracy</td>
+                            <td>Good (85-90%)</td>
+                            <td>Excellent (90-95%)</td>
+                        </tr>
+                        <tr>
+                            <td>Memory Usage</td>
+                            <td>Low</td>
+                            <td>Moderate</td>
+                        </tr>
+                        <tr>
+                            <td>Best For</td>
+                            <td>Large events, quick searches</td>
+                            <td>High accuracy requirements</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card shadow mb-4">
+            <div class="card-body p-4">
+                <h3><i class="fas fa-shield-alt"></i> Privacy & Security</h3>
+                <ul class="mt-3">
+                    <li>All photos are stored securely on the server</li>
+                    <li>Face embeddings are encrypted</li>
+                    <li>No data is shared with third parties</li>
+                    <li>Users can request photo deletion through admins</li>
+                    <li>HTTPS encryption for all data transfer</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card shadow mb-4">
+            <div class="card-body p-4">
+                <h3><i class="fas fa-users"></i> Use Cases</h3>
+                <div class="row mt-3">
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5><i class="fas fa-graduation-cap"></i> Education</h5>
+                                <p class="small">College events, graduation ceremonies, sports events</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5><i class="fas fa-building"></i> Corporate</h5>
+                                <p class="small">Conferences, team building, corporate events</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5><i class="fas fa-ring"></i> Weddings</h5>
+                                <p class="small">Wedding ceremonies, receptions, pre-wedding events</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5><i class="fas fa-music"></i> Festivals</h5>
+                                <p class="small">Music festivals, cultural events, exhibitions</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center">
+            <a href="{{ url_for('user.select_event') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-search"></i> Find Your Photos
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

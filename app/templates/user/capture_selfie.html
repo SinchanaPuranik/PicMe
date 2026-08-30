@@ -1,0 +1,416 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Capture Selfie - {{ event.name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-camera"></i> Find Your Photos</h4>
+                <small>Event: {{ event.name }}</small>
+            </div>
+            <div class="card-body p-4">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Instructions:</strong> Capture a clear photo of your face or upload a selfie. 
+                    Our AI will find all photos containing your face from this event.
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <h5><i class="fas fa-video"></i> Webcam Capture</h5>
+                                <video id="video" width="100%" height="300" autoplay style="border: 2px solid #ddd; border-radius: 8px; background: #000;"></video>
+                                <canvas id="canvas" style="display:none;"></canvas>
+                                <button id="captureBtn" class="btn btn-primary mt-3 w-100">
+                                    <i class="fas fa-camera"></i> Capture Photo
+                                </button>
+                                <button id="retakeBtn" class="btn btn-warning mt-2 w-100" style="display:none;">
+                                    <i class="fas fa-redo"></i> Retake
+                                button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <h5><i class="fas fa-upload"></i> Upload Selfie</h5>
+                                <div class="upload-area" id="uploadArea">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                    <p>Click to upload or drag and drop</p>
+                                    <input type="file" id="fileInput" accept="image/*" style="display:none;">
+                                </div>
+                                <img id="uploadPreview" style="display:none; max-width:100%; height:300px; object-fit:contain; border: 2px solid #ddd; border-radius: 8px; margin-top: 10px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Detector Selection -->
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h5><i class="fas fa-robot"></i> AI Model Selection</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="modelType" id="facenetRadio" value="facenet" checked>
+                                    <label class="form-check-label" for="facenetRadio">
+                                        <strong>FaceNet</strong> - Fast and efficient (128D embeddings)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="modelType" id="arcfaceRadio" value="arcface">
+                                    <label class="form-check-label" for="arcfaceRadio">
+                                        <strong>ArcFace</strong> - Higher accuracy (512D embeddings)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted mt-2 d-block"><i class="fas fa-info-circle"></i> </small>
+                    </div>
+                </div>
+                
+                <!-- Search Button -->
+                <div class="text-center mt-4">
+                    <button id="searchBtn" class="btn btn-success btn-lg" disabled>
+                        <i class="fas fa-search"></i> Search Photos
+                    </button>
+                </div>
+                
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="alert alert-warning mt-3" style="display:none;">
+                    <div class="text-center">
+                        <i class="fas fa-spinner fa-spin fa-2x mb-2"></i>
+                        <p class="mb-0">Searching for your photos... This may take a moment.</p>
+                    </div>
+                </div>
+                
+                <!-- Results Section -->
+                <div id="resultsSection" style="display:none;" class="mt-4">
+                    <!-- Summary Stats -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <h3 class="text-primary mb-0"><i class="fas fa-user"></i> <span id="individualCount">0</span></h3>
+                                    <p class="text-muted mb-0">Individual Photos</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <h3 class="text-success mb-0"><i class="fas fa-users"></i> <span id="groupCount">0</span></h3>
+                                    <p class="text-muted mb-0">Group Photos</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Individual Photos Section -->
+                    <div id="individualSection" style="display:none;" class="mb-5">
+                        <h4 class="border-bottom pb-2">
+                            <i class="fas fa-user text-primary"></i> Individual Photos 
+                            <span class="badge bg-primary" id="individualBadge">0</span>
+                        </h4>
+                        <div id="individualGrid" class="row g-3"></div>
+                    </div>
+                    
+                    <!-- Group Photos Section -->
+                    <div id="groupSection" style="display:none;" class="mb-5">
+                        <h4 class="border-bottom pb-2">
+                            <i class="fas fa-users text-success"></i> Group Photos 
+                            <span class="badge bg-success" id="groupBadge">0</span>
+                        </h4>
+                        <div id="groupGrid" class="row g-3"></div>
+                    </div>
+                    
+                    <!-- No Results Message -->
+                    <div id="noResults" class="text-center py-5" style="display:none;">
+                        <i class="fas fa-sad-tear fa-4x text-muted mb-3"></i>
+                        <h5>No matching photos found</h5>
+                        <p class="text-muted">Try with a different photo or check another event</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <a href="{{ url_for('user.select_event') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Events
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.upload-area {
+    border: 3px dashed #ddd;
+    border-radius: 8px;
+    padding: 40px;
+    cursor: pointer;
+    transition: all 0.3s;
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.upload-area:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+.upload-area.dragover {
+    border-color: #28a745;
+    background-color: #d4edda;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let capturedImage = null;
+let stream = null;
+
+// Webcam functionality
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const captureBtn = document.getElementById('captureBtn');
+const retakeBtn = document.getElementById('retakeBtn');
+const searchBtn = document.getElementById('searchBtn');
+
+// Start webcam
+navigator.mediaDevices.getUserMedia({ video: true })
+    .then(s => {
+        stream = s;
+        video.srcObject = stream;
+    })
+    .catch(err => {
+        console.error('Webcam error:', err);
+        alert('Unable to access webcam. Please use the upload option.');
+    });
+
+// Capture photo
+captureBtn.addEventListener('click', () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    capturedImage = canvas.toDataURL('image/jpeg');
+    
+    video.style.display = 'none';
+    canvas.style.display = 'block';
+    captureBtn.style.display = 'none';
+    retakeBtn.style.display = 'block';
+    searchBtn.disabled = false;
+});
+
+// Retake photo
+retakeBtn.addEventListener('click', () => {
+    video.style.display = 'block';
+    canvas.style.display = 'none';
+    captureBtn.style.display = 'block';
+    retakeBtn.style.display = 'none';
+    capturedImage = null;
+    
+    if (!document.getElementById('uploadPreview').src) {
+        searchBtn.disabled = true;
+    }
+});
+
+// Upload functionality
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const uploadPreview = document.getElementById('uploadPreview');
+
+uploadArea.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            capturedImage = e.target.result;
+            uploadPreview.src = capturedImage;
+            uploadPreview.style.display = 'block';
+            uploadArea.style.display = 'none';
+            searchBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Drag and drop
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            capturedImage = e.target.result;
+            uploadPreview.src = capturedImage;
+            uploadPreview.style.display = 'block';
+            uploadArea.style.display = 'none';
+            searchBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Search photos
+searchBtn.addEventListener('click', () => {
+    if (!capturedImage) {
+        alert('Please capture or upload a photo first');
+        return;
+    }
+    
+    const modelType = document.querySelector('input[name="modelType"]:checked').value;
+    
+    document.getElementById('loadingIndicator').style.display = 'block';
+    searchBtn.disabled = true;
+    
+    fetch('{{ url_for("user.search_photos", event_id=event.id) }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            image: capturedImage,
+            model_type: modelType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        
+        if (data.error) {
+            alert('Error: ' + data.error);
+            searchBtn.disabled = false;
+            return;
+        }
+        
+        displayResults(data);
+    })
+    .catch(error => {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        alert('Error searching photos: ' + error);
+        searchBtn.disabled = false;
+    });
+});
+
+function displayResults(data) {
+    const resultsSection = document.getElementById('resultsSection');
+    const individualGrid = document.getElementById('individualGrid');
+    const groupGrid = document.getElementById('groupGrid');
+    const individualSection = document.getElementById('individualSection');
+    const groupSection = document.getElementById('groupSection');
+    const noResults = document.getElementById('noResults');
+    
+    // Update counts
+    document.getElementById('individualCount').textContent = data.total_individual;
+    document.getElementById('groupCount').textContent = data.total_group;
+    document.getElementById('individualBadge').textContent = data.total_individual;
+    document.getElementById('groupBadge').textContent = data.total_group;
+    
+    // Clear grids
+    individualGrid.innerHTML = '';
+    groupGrid.innerHTML = '';
+    
+    // Check if we have any results
+    if (data.matches === 0) {
+        noResults.style.display = 'block';
+        individualSection.style.display = 'none';
+        groupSection.style.display = 'none';
+    } else {
+        noResults.style.display = 'none';
+        
+        // Display individual photos
+        if (data.individual_photos.length > 0) {
+            individualSection.style.display = 'block';
+            data.individual_photos.forEach(photo => {
+                const similarity = (photo.similarity * 100).toFixed(1);
+                individualGrid.innerHTML += `
+                    <div class="col-md-4 col-sm-6">
+                        <div class="card h-100 border-primary">
+                            <div class="card-header bg-primary text-white py-1 px-2 small">
+                                <i class="fas fa-user"></i> Solo Photo
+                            </div>
+                            <img src="${photo.url}" class="card-img-top" style="height: 250px; object-fit: cover;">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge bg-success">${similarity}% match</span>
+                                    <a href="${photo.url}" download class="btn btn-sm btn-primary">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            individualSection.style.display = 'none';
+        }
+        
+        // Display group photos
+        if (data.group_photos.length > 0) {
+            groupSection.style.display = 'block';
+            data.group_photos.forEach(photo => {
+                const similarity = (photo.similarity * 100).toFixed(1);
+                groupGrid.innerHTML += `
+                    <div class="col-md-4 col-sm-6">
+                        <div class="card h-100 border-success">
+                            <div class="card-header bg-success text-white py-1 px-2 small">
+                                <i class="fas fa-users"></i> Group Photo (${photo.num_faces} people)
+                            </div>
+                            <img src="${photo.url}" class="card-img-top" style="height: 250px; object-fit: cover;">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge bg-success">${similarity}% match</span>
+                                    <a href="${photo.url}" download class="btn btn-sm btn-success">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            groupSection.style.display = 'none';
+        }
+    }
+    
+    resultsSection.style.display = 'block';
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+});
+</script>
+{% endblock %}
+
+
+
+
