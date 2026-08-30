@@ -53,9 +53,6 @@
                     </div>
                     
                     <div class="mt-4">
-                        <a href="{{ url_for('user.select_event') }}" class="btn btn-primary btn-lg me-2 mb-2">
-                            <i class="fas fa-search"></i> Find My Photos
-                        </a>
                         {% if not current_user.is_authenticated %}
                         <div class="btn-group mb-2" role="group">
                             <a href="{{ url_for('auth.admin_login') }}" class="btn btn-danger btn-lg">
