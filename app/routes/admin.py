@@ -379,16 +379,12 @@ def process_photos(event_id):
             min_confidence = 0.7
 
         # ----------------------------------------------------
-        # Reset embeddings for fresh processing
+        # Process only unprocessed photos (don't reset existing)
         # ----------------------------------------------------
-
-        event.reset_event_embeddings()
-
-        db.session.commit()
 
         photos = (
             Photo.query
-            .filter_by(event_id=event_id)
+            .filter_by(event_id=event_id, processed=False)
             .all()
         )
 
@@ -521,6 +517,13 @@ def process_photos(event_id):
                 photo.processed = True
 
                 processed_count += 1
+                
+                # Commit after each photo so progress is saved
+                try:
+                    db.session.commit()
+                except Exception as commit_error:
+                    current_app.logger.error(f"Commit error: {commit_error}")
+                    db.session.rollback()
 
             except Exception as e:
 
@@ -528,10 +531,15 @@ def process_photos(event_id):
                     f"Error processing photo "
                     f"{photo.id}: {str(e)}"
                 )
-
+                
+                db.session.rollback()
                 continue
 
-        db.session.commit()
+        # Final commit (may be redundant but ensures everything is saved)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
         flash(
             f'Processed {processed_count} photos '
